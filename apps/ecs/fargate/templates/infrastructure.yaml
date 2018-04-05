@@ -140,7 +140,7 @@ Resources:
     Properties:
       Scheme: internal
       SecurityGroups:
-        - !GetAtt SecurityGroupWebapp.GroupId
+        - !GetAtt SecurityGroupPublic.GroupId
       Subnets:
         - !Ref PrivateSubnet1
         - !Ref PrivateSubnet2
@@ -177,6 +177,101 @@ Resources:
       ToPort: 8082
       SourceSecurityGroupId: !GetAtt SecurityGroupWebapp.GroupId
       GroupId: !GetAtt SecurityGroupWebapp.GroupId
+
+  WebappTargetGroupPublic:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 60
+      HealthCheckPath: /
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      Name: !Join ['-', [!Ref 'AWS::StackName', 'webapp']]
+      Port: 80
+      Protocol: HTTP
+      UnhealthyThresholdCount: 10
+      VpcId: !Ref VPC
+      TargetType: ip
+  PublicLoadBalancerListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    DependsOn:
+      - ALBPublic
+    Properties:
+      DefaultActions:
+        - TargetGroupArn: !Ref WebappTargetGroupPublic
+          Type: forward
+      LoadBalancerArn: !Ref ALBPublic
+      Port: 80
+      Protocol: HTTP
+
+  NameTargetGroupPrivate:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 60
+      HealthCheckPath: /resources/names/
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      Name: !Join ['-', [!Ref 'AWS::StackName', 'name']]
+      Port: 80
+      Protocol: HTTP
+      UnhealthyThresholdCount: 10
+      VpcId: !Ref VPC
+      TargetType: ip
+
+  GreetingTargetGroupPrivate:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 60
+      HealthCheckPath: /resources/greeting/
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      Name: !Join ['-', [!Ref 'AWS::StackName', 'greeting']]
+      Port: 80
+      Protocol: HTTP
+      UnhealthyThresholdCount: 10
+      VpcId: !Ref VPC
+      TargetType: ip
+
+  PrivateLoadBalancerListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    DependsOn:
+      - ALBPrivate
+    Properties:
+      DefaultActions:
+        - TargetGroupArn: !Ref NameTargetGroupPrivate
+          Type: forward
+      LoadBalancerArn: !Ref ALBPrivate
+      Port: 80
+      Protocol: HTTP
+  
+  NameListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Actions:
+        - TargetGroupArn: !Ref NameTargetGroupPrivate
+          Type: forward
+      Conditions:
+      - Field: path-pattern
+        Values:
+        - "name-service"
+      ListenerArn: !Ref PrivateLoadBalancerListener
+      Priority: 1
+
+  GreetingListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Actions:
+        - TargetGroupArn: !Ref GreetingTargetGroupPrivate
+          Type: forward
+      Conditions:
+      - Field: path-pattern
+        Values:
+        - "greeting-service"
+      ListenerArn: !Ref PrivateLoadBalancerListener
+      Priority: 2
+  
 Outputs:
   ECSCluster:
     Value: !Ref ECSCluster
@@ -200,3 +295,4 @@ Outputs:
     Value: !GetAtt ALBPrivate.DNSName
   SecurityGroupWebapp:
     Value: !GetAtt SecurityGroupWebapp.GroupId
+    
